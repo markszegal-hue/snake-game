@@ -24,3 +24,11 @@ python -m http.server 8000
 ```
 
 Enjoy! Pull requests and improvements welcome.
+
+## Play online
+
+The game is published via GitHub Pages. After the first action run the site will be available at:
+
+https://markszegal-hue.github.io/snake-game/
+
+It may take a minute for the first deployment to finish — open the URL after a short wait.
