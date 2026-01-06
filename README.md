@@ -1,5 +1,7 @@
 # snake-game
 
+[![Deploy to Pages](https://github.com/markszegal-hue/snake-game/actions/workflows/pages.yml/badge.svg)](https://github.com/markszegal-hue/snake-game/actions/workflows/pages.yml)
+
 A simple, single-file Snake game implemented in HTML/CSS/JavaScript.
 
 ## Features
