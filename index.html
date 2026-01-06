@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Simple Snake Game</title>
+  <style>
+    :root { --bg: #111; --panel: #000; --accent: #0f0; --muted: #7CFC00; }
+    html,body { height:100%; margin:0; }
+    body {
+      background: var(--bg);
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+    .container { position: relative; }
+    canvas { background: var(--panel); border: 2px solid var(--accent); display:block; }
+    h1 { position: absolute; top: -48px; left: 0; right:0; text-align:center; margin:0; }
+    .hud { position:absolute; left:8px; top:8px; color:#fff; font-weight:600; }
+    .controls { position: absolute; right: 8px; top: 8px; display:flex; gap:8px; }
+    button { background: rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(255,255,255,0.08); padding:6px 10px; border-radius:4px; cursor:pointer; }
+    button:active { transform: translateY(1px); }
+    .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.6); color:#fff; font-size:20px; display:none; flex-direction:column; gap:12px; }
+    .overlay.show { display:flex; }
+    .instructions { position: absolute; bottom: -70px; left: 0; right: 0; text-align: center; color:#bbb; font-size:14px; }
+    @media (max-width:520px) { canvas { width:320px; height:320px; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🐍 Snake Game</h1>
+    <div class="hud" id="score">Score: 0</div>
+    <div class="controls">
+      <button id="startBtn">Start</button>
+      <button id="pauseBtn">Pause</button>
+      <button id="restartBtn">Restart</button>
+    </div>
+
+    <canvas id="game" width="400" height="400" aria-label="Snake game"></canvas>
+
+    <div class="overlay" id="overlay">
+      <div id="overlayText">Game Over</div>
+      <button id="overlayRestart">Restart</button>
+    </div>
+
+    <div class="instructions">Use Arrow keys or WASD to move. Space to pause/resume. On mobile: swipe to steer.</div>
+  </div>
+
+<script>
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const box = 20;
+  const gridCount = canvas.width / box; // 20 for 400x400/20
+
+  let snake = [{ x: 9 * box, y: 10 * box }];
+  let direction = 'RIGHT';
+  let score = 0;
+  let food = null;
+
+  const scoreEl = document.getElementById('score');
+  const startBtn = document.getElementById('startBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const overlay = document.getElementById('overlay');
+  const overlayText = document.getElementById('overlayText');
+  const overlayRestart = document.getElementById('overlayRestart');
+
+  let gameInterval = null;
+  const speed = 100; // ms per tick
+  let running = false;
+
+  function getRandomFood() {
+    let pos;
+    do {
+      pos = {
+        x: Math.floor(Math.random() * gridCount) * box,
+        y: Math.floor(Math.random() * gridCount) * box
+      };
+    } while (snake.some(seg => seg.x === pos.x && seg.y === pos.y));
+    return pos;
+  }
+
+  function resetGame() {
+    snake = [{ x: 9 * box, y: 10 * box }];
+    direction = 'RIGHT';
+    score = 0;
+    food = getRandomFood();
+    updateScore();
+    hideOverlay();
+  }
+
+  function startGame() {
+    if (running) return;
+    running = true;
+    gameInterval = setInterval(draw, speed);
+    pauseBtn.textContent = 'Pause';
+  }
+
+  function pauseGame() {
+    if (!running) return;
+    running = false;
+    clearInterval(gameInterval);
+    gameInterval = null;
+    pauseBtn.textContent = 'Resume';
+  }
+
+  function togglePause() {
+    if (running) pauseGame(); else startGame();
+  }
+
+  function showOverlay(text) {
+    overlayText.textContent = text;
+    overlay.classList.add('show');
+  }
+
+  function hideOverlay() {
+    overlay.classList.remove('show');
+  }
+
+  function endGame() {
+    pauseGame();
+    showOverlay('Game Over — Score: ' + score);
+  }
+
+  function updateScore() {
+    scoreEl.textContent = 'Score: ' + score;
+  }
+
+  function collision(head, array) {
+    return array.some(segment => head.x === segment.x && head.y === segment.y);
+  }
+
+  function changeDirectionByKey(key) {
+    let requested = null;
+    if (key === 'ArrowLeft' || key === 'a' || key === 'A') requested = 'LEFT';
+    else if (key === 'ArrowUp' || key === 'w' || key === 'W') requested = 'UP';
+    else if (key === 'ArrowRight' || key === 'd' || key === 'D') requested = 'RIGHT';
+    else if (key === 'ArrowDown' || key === 's' || key === 'S') requested = 'DOWN';
+    if (!requested) return;
+    // Prevent reversing when length > 1
+    if (snake.length > 1) {
+      if (requested === 'LEFT' && direction === 'RIGHT') return;
+      if (requested === 'RIGHT' && direction === 'LEFT') return;
+      if (requested === 'UP' && direction === 'DOWN') return;
+      if (requested === 'DOWN' && direction === 'UP') return;
+    }
+    direction = requested;
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.code === 'Space') { togglePause(); e.preventDefault(); return; }
+    changeDirectionByKey(e.key);
+  });
+
+  // Touch (swipe) support
+  let touchStartX = 0, touchStartY = 0;
+  canvas.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    touchStartX = t.clientX; touchStartY = t.clientY;
+  }, { passive: true });
+  canvas.addEventListener('touchend', (e) => {
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartX;
+    const dy = t.clientY - touchStartY;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (Math.abs(dx) > 20) changeDirectionByKey(dx > 0 ? 'ArrowRight' : 'ArrowLeft');
+    } else {
+      if (Math.abs(dy) > 20) changeDirectionByKey(dy > 0 ? 'ArrowDown' : 'ArrowUp');
+    }
+  }, { passive: true });
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // draw snake
+    for (let i = 0; i < snake.length; i++) {
+      ctx.fillStyle = i === 0 ? '#0f0' : '#7CFC00';
+      ctx.fillRect(snake[i].x, snake[i].y, box, box);
+    }
+
+    // draw food
+    ctx.fillStyle = 'red';
+    ctx.fillRect(food.x, food.y, box, box);
+
+    let headX = snake[0].x;
+    let headY = snake[0].y;
+
+    if (direction === 'LEFT') headX -= box;
+    if (direction === 'UP') headY -= box;
+    if (direction === 'RIGHT') headX += box;
+    if (direction === 'DOWN') headY += box;
+
+    // Eat food
+    if (headX === food.x && headY === food.y) {
+      score++;
+      updateScore();
+      food = getRandomFood();
+    } else {
+      snake.pop();
+    }
+
+    const newHead = { x: headX, y: headY };
+
+    // Game over conditions: wall or self collision
+    if (
+      headX < 0 || headY < 0 || headX >= canvas.width || headY >= canvas.height ||
+      collision(newHead, snake)
+    ) {
+      endGame();
+      return;
+    }
+
+    snake.unshift(newHead);
+  }
+
+  // UI wiring
+  startBtn.addEventListener('click', () => { startGame(); startBtn.blur(); });
+  pauseBtn.addEventListener('click', () => { togglePause(); pauseBtn.blur(); });
+  restartBtn.addEventListener('click', () => { resetGame(); startGame(); restartBtn.blur(); });
+  overlayRestart.addEventListener('click', () => { resetGame(); startGame(); overlayRestart.blur(); });
+
+  // initialize
+  resetGame();
+  // Autostart
+  // startGame();
+
+  // Provide a small visual test: start stopped so user can press Start, or autostart by uncommenting above.
+</script>
+</body>
+</html>
